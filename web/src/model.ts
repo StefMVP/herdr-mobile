@@ -10,7 +10,7 @@ export type Space = { id: string; name: string; folder: string; tabs: { id: stri
 export type State = { up: boolean; core: string | null; at: number; spaces: Space[]; terminals: T[] };
 export type Kind = "needs" | "done" | "working" | "idle";
 
-/** docs/labels.md: blocked/error need you; working; else done when turn > seen. */
+/** Herdr status labels: blocked or error need you; working; else done when turn > seen. */
 export function kindOf(t: T): Kind {
   if (t.st === "blocked" || t.st === "error") return "needs";
   if (t.st === "working") return "working";
