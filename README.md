@@ -16,9 +16,9 @@ Seen and pinned state use the `herdr.seen` and `herdr.pinned` labels, so the des
 
 ## Requirements
 
-- [Bun](https://bun.sh), herdr-core (`hc`) on the same machine, and [Tailscale](https://tailscale.com).
-- Optional: the Herdr desktop app (`herdr-app`) for new space and close. Without it, these controls do not show.
-- Optional: Hex (`hex transcribe`) and `ffmpeg` for dictation. Without them, the mic does not show.
+- [Bun](https://bun.sh), [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`) on the same machine, and [Tailscale](https://tailscale.com).
+- Optional: the [Herdr desktop app](https://github.com/herdrdev/herdr-app) (`herdr-app`) for new space and close. Without it, these controls do not show.
+- Optional: [Hex](https://github.com/anomalyco/hex) with Labs › Transcribe files on, and `ffmpeg`, for dictation. Without them, the mic does not show.
 
 ## Install
 
