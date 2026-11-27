@@ -1,0 +1,23 @@
+{
+  "name": "herdr-mobile",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "start": "bun server/main.ts",
+    "dev": "bun scripts/build.ts && HM_DEV=1 bun server/main.ts",
+    "test": "bun test",
+    "check": "tsc --noEmit && bun test"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "marked": "^18.3.0"
+  },
+  "devDependencies": {
+    "@browserbasehq/stagehand": "^4.5.0",
+    "@types/bun": "^1.4.5",
+    "typescript": "^7.0.2"
+  },
+  "license": "MIT"
+}

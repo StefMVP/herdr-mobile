@@ -1,0 +1,16 @@
+[Unit]
+Description=herdr-mobile: mobile web app for herdr-core (tailnet only, via tailscale serve)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/herdr-mobile
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+Environment=HM_PORT=7791
+# HM_ALLOWED_LOGINS, HM_ALLOWED_DEVICES and the other settings (see README)
+EnvironmentFile=-%h/.config/herdr-mobile/env
+ExecStart=/usr/bin/env bun server/main.ts
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
