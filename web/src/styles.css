@@ -202,8 +202,11 @@ svg { display: block; }
 .thead .ib .cnt { position: absolute; right: 2px; bottom: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--bg); font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
 .thead .ib .cnt:empty { display: none; }
 .rbtn.rec { background: var(--red); color: #fff; border-color: var(--red); animation: rec 1.2s ease-in-out infinite; }
-.rbtn.busy { color: var(--accent); opacity: .6; pointer-events: none; }
+.rbtn.busy, .rbtn.sm.busy { width: auto; padding: 0 14px; gap: 6px; display: flex; align-items: center; color: var(--accent); font-size: 14px; font-weight: 600; pointer-events: none; }
+.rbtn.busy .spin { width: 18px; height: 18px; }
 @keyframes rec { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--red) 30%, transparent); } }
+.lv { display: flex; align-items: center; gap: 3px; height: 22px; }
+.lv i { width: 3px; height: 100%; border-radius: 2px; background: currentColor; transform: scaleY(.15); transition: transform 60ms linear; }
 .rbtn.sm { width: 44px; height: 44px; }
 .group.scroll { max-height: 52vh; overflow-y: auto; }
 .note { color: var(--mut); font-size: 15px; margin: 0 4px 14px; line-height: 1.4; }

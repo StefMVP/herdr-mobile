@@ -696,28 +696,58 @@ function compose(addr: string, paste: (text: string) => void, initial = "") {
 }
 
 // ---------- dictation: record on the phone, transcribe on the server with the model selected in Hex ----------
-let rec: { mr: MediaRecorder; stream: MediaStream; btn: HTMLElement } | null = null;
-function stopMic() { if (rec) { rec.mr.onstop = null; rec.mr.stop(); rec.stream.getTracks().forEach((t) => t.stop()); rec.btn.classList.remove("rec"); rec = null; } }
+// The mic button shows the state: live voice level bars while it records, a spinner while the server transcribes.
+let rec: { mr: MediaRecorder; stream: MediaStream; btn: HTMLElement; meter: () => void } | null = null;
+function micLook(btn: HTMLElement, state: "idle" | "rec" | "busy") {
+  btn.classList.toggle("rec", state === "rec"); btn.classList.toggle("busy", state === "busy");
+  btn.innerHTML = state === "rec" ? `<span class="lv">${"<i></i>".repeat(5)}</span>` : state === "busy" ? `${I.spin}<span>Transcribing</span>` : I.mic;
+  btn.setAttribute("aria-label", state === "rec" ? "Stop dictation" : state === "busy" ? "Transcribing" : "Dictate");
+}
+/** Moves the level bars in the button with the voice. Returns a stop function. */
+function meter(ctx: AudioContext, stream: MediaStream, btn: HTMLElement) {
+  const an = ctx.createAnalyser();
+  an.fftSize = 256; an.smoothingTimeConstant = 0.6;
+  ctx.createMediaStreamSource(stream).connect(an);
+  const buf = new Uint8Array(an.frequencyBinCount);
+  const bars = Array.from(btn.querySelectorAll<HTMLElement>(".lv i"));
+  const shape = [0.55, 0.85, 1, 0.85, 0.55];
+  let raf = 0;
+  const tick = () => {
+    an.getByteTimeDomainData(buf);
+    let sum = 0;
+    for (const v of buf) sum += ((v - 128) / 128) ** 2;
+    const level = Math.min(1, Math.sqrt(sum / buf.length) * 5);
+    bars.forEach((b, i) => { b.style.transform = `scaleY(${Math.max(0.15, level * shape[i] * (0.8 + Math.random() * 0.4))})`; });
+    raf = requestAnimationFrame(tick);
+  };
+  tick();
+  return () => { cancelAnimationFrame(raf); ctx.close().catch(() => {}); };
+}
+function stopMic() { if (rec) { rec.mr.onstop = null; rec.mr.stop(); rec.stream.getTracks().forEach((t) => t.stop()); rec.meter(); micLook(rec.btn, "idle"); rec = null; } }
 let micStarting = false, micCancel = false;
 async function mic(btn: HTMLElement, onText: (text: string) => void) {
   if (rec) { if (rec.mr.state === "recording") rec.mr.stop(); return; }
-  if (micStarting) { micCancel = true; btn.classList.remove("rec"); return; } // tapped again before the mic was ready
+  if (btn.classList.contains("busy")) return;
+  if (micStarting) { micCancel = true; micLook(btn, "idle"); return; } // tapped again before the mic was ready
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") return toast("This browser cannot record audio");
+  // Make the audio context inside the tap: iOS starts audio only from a user gesture.
+  const ctx = new AudioContext();
+  ctx.resume().catch(() => {});
   let stream: MediaStream;
   micStarting = true; micCancel = false;
-  btn.classList.add("rec");
+  micLook(btn, "rec");
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { micStarting = false; btn.classList.remove("rec"); return toast("Microphone access was refused"); }
+  catch { micStarting = false; ctx.close().catch(() => {}); micLook(btn, "idle"); return toast("Microphone access was refused"); }
   micStarting = false;
-  if (micCancel || !btn.isConnected) { stream.getTracks().forEach((t) => t.stop()); btn.classList.remove("rec"); return; }
+  if (micCancel || !btn.isConnected) { stream.getTracks().forEach((t) => t.stop()); ctx.close().catch(() => {}); micLook(btn, "idle"); return; }
   const mr = new MediaRecorder(stream);
   const chunks: Blob[] = [];
   mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
   mr.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop());
+    rec?.meter();
     rec = null;
-    delete btn.dataset.state;
-    btn.classList.remove("rec"); btn.classList.add("busy");
+    micLook(btn, "busy");
     try {
       const blob = new Blob(chunks, { type: mr.mimeType || "audio/mp4" });
       const r = await fetch("/api/dictate", { method: "POST", headers: { "x-hm": "1", "content-type": blob.type }, body: blob });
@@ -725,11 +755,10 @@ async function mic(btn: HTMLElement, onText: (text: string) => void) {
       if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
       if (j.text) onText(j.text); else toast("No speech heard");
     } catch (err) { toast((err as Error).message); }
-    btn.classList.remove("busy");
+    micLook(btn, "idle");
   };
   mr.start();
-  rec = { mr, stream, btn };
-  btn.dataset.state = "recording";
+  rec = { mr, stream, btn, meter: meter(ctx, stream, btn) };
 }
 async function shrink(f: File): Promise<string> {
   const b64 = (b: Blob) => new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.readAsDataURL(b); });
