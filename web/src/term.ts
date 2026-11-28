@@ -100,12 +100,44 @@ export function openTerm(host: HTMLElement, wrap: HTMLElement, addr: string, o: 
       if (ws?.readyState === 1) ws.send(JSON.stringify({ t: "resize", cols, rows }));
     }, 120);
   };
+  // Touch scroll: xterm.js 6 does not scroll on touch, so a vertical swipe scrolls here, one line per cell height.
+  // A program that uses the mouse gets wheel events. A program on the alternate screen without the mouse gets arrows.
+  // A horizontal swipe stays native, for the wide (desktop size) mode.
+  let ty = 0, tx = 0, acc = 0, lock: "" | "v" | "h" = "";
+  const scroll = (n: number, x: number, y: number) => {
+    if (term.modes.mouseTrackingMode !== "none") {
+      const r = host.getBoundingClientRect();
+      const col = Math.max(1, Math.min(term.cols, Math.ceil(((x - r.left) / r.width) * term.cols)));
+      const row = Math.max(1, Math.min(term.rows, Math.ceil(((y - r.top) / r.height) * term.rows)));
+      raw(`\x1b[<${n < 0 ? 64 : 65};${col};${row}M`.repeat(Math.abs(n)));
+    } else if (term.buffer.active.type === "alternate") raw((n < 0 ? KEYS.up : KEYS.down).repeat(Math.abs(n)));
+    else term.scrollLines(n);
+  };
+  host.addEventListener("touchstart", (e) => { ty = e.touches[0].clientY; tx = e.touches[0].clientX; acc = 0; lock = ""; }, { passive: true });
+  host.addEventListener("touchmove", (e) => {
+    if (e.touches.length !== 1) return;
+    const y = e.touches[0].clientY, x = e.touches[0].clientX;
+    if (!lock) {
+      if (Math.abs(y - ty) < 8 && Math.abs(x - tx) < 8) return;
+      lock = Math.abs(y - ty) >= Math.abs(x - tx) ? "v" : "h";
+    }
+    if (lock !== "v") return;
+    e.preventDefault();
+    acc += ty - y;
+    ty = y;
+    const cell = (host.querySelector(".xterm-screen")?.clientHeight || host.clientHeight) / term.rows || 16;
+    const n = Math.trunc(acc / cell);
+    if (n) { acc -= n * cell; scroll(n, x, y); }
+  }, { passive: false });
+
   const ro = new ResizeObserver(onResize);
   ro.observe(wrap);
   // iOS: keep the key bar above the on-screen keyboard.
   const vv = window.visualViewport;
-  const onVV = () => { const p = wrap.closest(".term") as HTMLElement | null; if (p && vv) p.style.height = `${vv.height}px`; onResize(); };
+  // iOS can also pan the page when the keyboard opens, so follow the visible area.
+  const onVV = () => { const p = wrap.closest(".term") as HTMLElement | null; if (p && vv) { p.style.height = `${vv.height}px`; p.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : ""; } onResize(); };
   vv?.addEventListener("resize", onVV);
+  vv?.addEventListener("scroll", onVV);
 
   return {
     key(name) { raw(KEYS[name] ?? name); },
@@ -125,6 +157,6 @@ export function openTerm(host: HTMLElement, wrap: HTMLElement, addr: string, o: 
       return true;
     },
     focusStream(on) { if (ws?.readyState === 1) ws.send(JSON.stringify({ t: "focus", on })); },
-    dispose() { disposed = true; ro.disconnect(); vv?.removeEventListener("resize", onVV); ws?.close(); term.dispose(); },
+    dispose() { disposed = true; ro.disconnect(); vv?.removeEventListener("resize", onVV); vv?.removeEventListener("scroll", onVV); ws?.close(); term.dispose(); },
   };
 }
